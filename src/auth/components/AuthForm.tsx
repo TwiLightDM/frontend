@@ -3,11 +3,17 @@ import React, {useState} from "react";
 import {SubmitButton} from "./SubmitButton.tsx";
 import styled from "styled-components";
 
-type Props = {
+interface Props {
     submitText: string,
     onSwitchPage?: () => void,
     switchText?: string,
     isSignUp?: boolean,
+}
+
+interface Response {
+    id?: string,
+    access_token: string,
+    refresh_token: string,
 }
 
 export const AuthForm: React.FC<Props> = ({submitText, switchText, onSwitchPage, isSignUp}) => {
@@ -15,9 +21,12 @@ export const AuthForm: React.FC<Props> = ({submitText, switchText, onSwitchPage,
     const [password, setPassword] = useState<string>('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState<string | null>(null)
+    const [response, setResponse] = useState<Response | null>(null)
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
+        setResponse(null);
 
         if (!email || !password) {
             setError('Пожалуйста, заполните все поля.')
@@ -33,6 +42,28 @@ export const AuthForm: React.FC<Props> = ({submitText, switchText, onSwitchPage,
         }
 
         console.log("Submitted");
+
+        const url = `http://localhost:8080/${isSignUp ? 'signup' : 'signin'}`
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+
+            if (response.status !== 200) {
+                setError(`Ошибка ${response.status}: ${response.statusText}`);
+                setResponse(null);
+                return;
+            }
+
+            const data: Response = await response.json();
+            setResponse(data);
+            setError(null);
+        } catch  {
+            setError("Сервер не доступен");
+            setResponse(null);
+        }
     }
 
     return (
@@ -62,6 +93,14 @@ export const AuthForm: React.FC<Props> = ({submitText, switchText, onSwitchPage,
             )}
 
             {error && <ErrorMessage>{error}</ErrorMessage>}
+
+            {response && (
+                <ResultBlock>
+                    {response.id && <div><strong>ID:</strong> {response.id}</div>}
+                    <div><strong>Access Token:</strong> {response.access_token}</div>
+                    <div><strong>Refresh Token:</strong> {response.refresh_token}</div>
+                </ResultBlock>
+            )}
 
             <SubmitButton text={submitText}/>
 
@@ -107,4 +146,24 @@ const ErrorMessage = styled.p`
     font-size: 0.9rem;
     margin-bottom: 0.1rem;
     text-align: center;
+`
+
+const ResultBlock = styled.div`
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    
+    strong {
+        display: inline-block;
+        min-width: 110px;
+    }
+
+    div {
+        margin-bottom: 0.3rem;
+    }
 `
